@@ -1,101 +1,116 @@
 package before;
 
-/** デザインパターン適用前：トッピングと注文状態を条件分岐で処理する。 */
+import java.util.ArrayList;
+import java.util.List;
+
+/** 適用前：種類フラグと状態の条件分岐によって鑑賞リストを管理する。 */
 public class BeforeMain {
-    enum Status { ACCEPTED, COOKING, READY, DELIVERED }
+    enum Status { UNWATCHED, WATCHING, WATCHED }
 
-    static class Order {
-        private final int number;
-        private final String menu;
-        private final boolean cheese;
-        private final boolean egg;
-        private Status status = Status.ACCEPTED;
+    static class Entry {
+        private final String title;
+        private final boolean group;
+        private final List<Entry> children = new ArrayList<>();
+        private Status status = Status.UNWATCHED;
 
-        Order(int number, String menu, boolean cheese, boolean egg) {
-            if (!menu.equals("焼きそば") && !menu.equals("お好み焼き")) {
-                throw new IllegalArgumentException("未対応のメニュー: " + menu);
-            }
-            this.number = number;
-            this.menu = menu;
-            this.cheese = cheese;
-            this.egg = egg;
+        Entry(String title, boolean group) {
+            this.title = title;
+            this.group = group;
         }
 
-        String description() {
-            String result = menu;
-            if (cheese) result += " + チーズ";
-            if (egg) result += " + 目玉焼き";
-            return result;
+        void add(Entry child) {
+            if (!group) throw new IllegalStateException("作品には追加できません");
+            children.add(java.util.Objects.requireNonNull(child));
         }
 
-        int price() {
-            int result = menu.equals("焼きそば") ? 400 : 500;
-            if (cheese) result += 80;
-            if (egg) result += 100;
-            return result;
+        int totalCount() {
+            if (!group) return 1;
+            int count = 0;
+            for (Entry child : children) count += child.totalCount();
+            return count;
         }
 
-        String statusLabel() {
+        int watchedCount() {
+            if (!group) return status == Status.WATCHED ? 1 : 0;
+            int count = 0;
+            for (Entry child : children) count += child.watchedCount();
+            return count;
+        }
+
+        String label() {
             switch (status) {
-                case ACCEPTED: return "受付済み";
-                case COOKING: return "調理中";
-                case READY: return "受渡し待ち";
-                case DELIVERED: return "受渡し済み";
+                case UNWATCHED: return "未鑑賞";
+                case WATCHING: return "鑑賞中";
+                case WATCHED: return "鑑賞済み";
                 default: throw new IllegalStateException();
             }
         }
 
-        void startCooking() {
-            if (status == Status.ACCEPTED) {
-                status = Status.COOKING;
-                System.out.println("調理を開始しました。");
+        void print(String indent) {
+            if (group) {
+                System.out.printf("%s[%s] %d/%d作品鑑賞済み%n",
+                        indent, title, watchedCount(), totalCount());
+                for (Entry child : children) child.print(indent + "  ");
             } else {
-                System.out.println("調理開始不可（現在: " + statusLabel() + "）");
+                System.out.println(indent + title + "：" + label());
             }
         }
 
-        void finishCooking() {
-            if (status == Status.COOKING) {
-                status = Status.READY;
-                System.out.println("調理が完了しました。");
-            } else {
-                System.out.println("調理完了不可（現在: " + statusLabel() + "）");
-            }
+        void start() {
+            requireMovie();
+            if (status == Status.UNWATCHED) {
+                status = Status.WATCHING;
+                message("鑑賞を開始しました");
+            } else reject("開始");
         }
 
-        void deliver() {
-            if (status == Status.READY) {
-                status = Status.DELIVERED;
-                System.out.println("商品を受け渡しました。");
-            } else {
-                System.out.println("受渡し不可（現在: " + statusLabel() + "）");
-            }
+        void finish() {
+            requireMovie();
+            if (status == Status.WATCHING) {
+                status = Status.WATCHED;
+                message("鑑賞を完了しました");
+            } else reject("完了");
         }
 
-        void printSummary() {
-            System.out.printf("注文%d: %s / %d円 / %s%n",
-                    number, description(), price(), statusLabel());
+        void rewatch() {
+            requireMovie();
+            if (status == Status.WATCHED) {
+                status = Status.WATCHING;
+                message("再鑑賞を開始しました");
+            } else reject("再鑑賞");
         }
+
+        private void requireMovie() {
+            if (group) throw new IllegalStateException("作品を選択してください");
+        }
+        private void message(String text) { System.out.println(title + "：" + text); }
+        private void reject(String action) { message(action + "不可（" + label() + "）"); }
     }
 
     public static void main(String[] args) {
-        Order first = new Order(1, "焼きそば", true, true);
-        Order second = new Order(2, "お好み焼き", false, true);
-        first.printSummary();
-        second.printSummary();
-
-        // 調理前の受渡し、調理開始の重複、受渡しの重複を拒否する。
-        first.deliver();
-        first.startCooking();
-        first.startCooking();
-        first.finishCooking();
-        first.deliver();
-        first.deliver();
-        first.printSummary();
-
-        second.startCooking();
-        second.finishCooking();
-        second.deliver();
-        second.printSummary();
+        Entry root = new Entry("ディズニー作品の鑑賞リスト", true);
+        Entry series = new Entry("アナと雪の女王シリーズ", true);
+        Entry first = new Entry("アナと雪の女王", false);
+        Entry second = new Entry("アナと雪の女王2", false);
+        Entry other = new Entry("塔の上のラプンツェル", false);
+        root.add(series);
+        series.add(first);
+        series.add(second);
+        root.add(other);
+        root.print("");
+        System.out.println("--- 鑑賞操作 ---");
+        first.finish();
+        first.rewatch();
+        first.start();
+        first.start();
+        first.finish();
+        first.finish();
+        first.start();
+        first.rewatch();
+        root.print("");
+        first.finish();
+        second.start();
+        System.out.println("--- 最終一覧 ---");
+        root.print("");
     }
 }

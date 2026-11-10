@@ -1,132 +1,122 @@
 package after;
 
-/** デザインパターン適用後：Decoratorで商品を構成し、Stateで注文を管理する。 */
+import java.util.ArrayList;
+import java.util.List;
+
+/** 適用後：Compositeで階層を、Stateで作品の鑑賞状態を管理する。 */
 public class AfterMain {
-    // Component：基本商品とトッピングを共通の型で扱う。
-    interface Food {
-        String description();
-        int price();
+    // Component：作品とグループに共通の操作。
+    interface WatchEntry {
+        int totalCount();
+        int watchedCount();
+        void print(String indent);
     }
 
-    static class Yakisoba implements Food {
-        public String description() { return "焼きそば"; }
-        public int price() { return 400; }
-    }
+    // Composite：子の種類を判定せず、表示と集計を再帰的に行う。
+    static class WatchGroup implements WatchEntry {
+        private final String title;
+        private final List<WatchEntry> children = new ArrayList<>();
 
-    static class Okonomiyaki implements Food {
-        public String description() { return "お好み焼き"; }
-        public int price() { return 500; }
-    }
-
-    // Decorator：包み込んだ商品に処理を委譲する。
-    abstract static class Topping implements Food {
-        protected final Food food;
-
-        Topping(Food food) {
-            this.food = java.util.Objects.requireNonNull(food);
+        WatchGroup(String title) { this.title = title; }
+        void add(WatchEntry child) {
+            children.add(java.util.Objects.requireNonNull(child));
         }
-
-        public String description() { return food.description(); }
-        public int price() { return food.price(); }
+        public int totalCount() {
+            int count = 0;
+            for (WatchEntry child : children) count += child.totalCount();
+            return count;
+        }
+        public int watchedCount() {
+            int count = 0;
+            for (WatchEntry child : children) count += child.watchedCount();
+            return count;
+        }
+        public void print(String indent) {
+            System.out.printf("%s[%s] %d/%d作品鑑賞済み%n",
+                    indent, title, watchedCount(), totalCount());
+            for (WatchEntry child : children) child.print(indent + "  ");
+        }
     }
 
-    static class Cheese extends Topping {
-        Cheese(Food food) { super(food); }
-        public String description() { return super.description() + " + チーズ"; }
-        public int price() { return super.price() + 80; }
-    }
-
-    static class FriedEgg extends Topping {
-        FriedEgg(Food food) { super(food); }
-        public String description() { return super.description() + " + 目玉焼き"; }
-        public int price() { return super.price() + 100; }
-    }
-
-    // State：各状態で許可する操作だけを具象状態クラスで実装する。
-    interface OrderState {
+    // State：不許可操作の共通処理。許可する操作を各状態で上書きする。
+    interface ViewingState {
         String label();
+        default int watchedCount() { return 0; }
+        default void start(Movie movie) { movie.reject("開始", label()); }
+        default void finish(Movie movie) { movie.reject("完了", label()); }
+        default void rewatch(Movie movie) { movie.reject("再鑑賞", label()); }
+    }
 
-        default void startCooking(Order order) {
-            System.out.println("調理開始不可（現在: " + label() + "）");
-        }
-
-        default void finishCooking(Order order) {
-            System.out.println("調理完了不可（現在: " + label() + "）");
-        }
-
-        default void deliver(Order order) {
-            System.out.println("受渡し不可（現在: " + label() + "）");
+    static class Unwatched implements ViewingState {
+        public String label() { return "未鑑賞"; }
+        public void start(Movie movie) {
+            movie.changeState(new Watching());
+            movie.message("鑑賞を開始しました");
         }
     }
 
-    static class Accepted implements OrderState {
-        public String label() { return "受付済み"; }
-        public void startCooking(Order order) {
-            order.changeState(new Cooking());
-            System.out.println("調理を開始しました。");
+    static class Watching implements ViewingState {
+        public String label() { return "鑑賞中"; }
+        public void finish(Movie movie) {
+            movie.changeState(new Watched());
+            movie.message("鑑賞を完了しました");
         }
     }
 
-    static class Cooking implements OrderState {
-        public String label() { return "調理中"; }
-        public void finishCooking(Order order) {
-            order.changeState(new Ready());
-            System.out.println("調理が完了しました。");
+    static class Watched implements ViewingState {
+        public String label() { return "鑑賞済み"; }
+        public int watchedCount() { return 1; }
+        public void rewatch(Movie movie) {
+            movie.changeState(new Watching());
+            movie.message("再鑑賞を開始しました");
         }
     }
 
-    static class Ready implements OrderState {
-        public String label() { return "受渡し待ち"; }
-        public void deliver(Order order) {
-            order.changeState(new Delivered());
-            System.out.println("商品を受け渡しました。");
+    // CompositeのLeafであり、StateのContextでもある。
+    static class Movie implements WatchEntry {
+        private final String title;
+        private ViewingState state = new Unwatched();
+
+        Movie(String title) { this.title = title; }
+        private void changeState(ViewingState next) { state = next; }
+        private void message(String text) { System.out.println(title + "：" + text); }
+        private void reject(String action, String label) {
+            message(action + "不可（" + label + "）");
         }
-    }
-
-    static class Delivered implements OrderState {
-        public String label() { return "受渡し済み"; }
-    }
-
-    // Context：状態ごとの分岐を書かず、現在の状態オブジェクトへ委譲する。
-    static class Order {
-        private final int number;
-        private final Food food;
-        private OrderState state = new Accepted();
-
-        Order(int number, Food food) {
-            this.number = number;
-            this.food = java.util.Objects.requireNonNull(food);
-        }
-
-        private void changeState(OrderState next) { state = next; }
-        void startCooking() { state.startCooking(this); }
-        void finishCooking() { state.finishCooking(this); }
-        void deliver() { state.deliver(this); }
-
-        void printSummary() {
-            System.out.printf("注文%d: %s / %d円 / %s%n",
-                    number, food.description(), food.price(), state.label());
+        void start() { state.start(this); }
+        void finish() { state.finish(this); }
+        void rewatch() { state.rewatch(this); }
+        public int totalCount() { return 1; }
+        public int watchedCount() { return state.watchedCount(); }
+        public void print(String indent) {
+            System.out.println(indent + title + "：" + state.label());
         }
     }
 
     public static void main(String[] args) {
-        Order first = new Order(1, new FriedEgg(new Cheese(new Yakisoba())));
-        Order second = new Order(2, new FriedEgg(new Okonomiyaki()));
-        first.printSummary();
-        second.printSummary();
-
-        // 適用前と同じ操作を、同じ順序で実行する。
-        first.deliver();
-        first.startCooking();
-        first.startCooking();
-        first.finishCooking();
-        first.deliver();
-        first.deliver();
-        first.printSummary();
-
-        second.startCooking();
-        second.finishCooking();
-        second.deliver();
-        second.printSummary();
+        WatchGroup root = new WatchGroup("ディズニー作品の鑑賞リスト");
+        WatchGroup series = new WatchGroup("アナと雪の女王シリーズ");
+        Movie first = new Movie("アナと雪の女王");
+        Movie second = new Movie("アナと雪の女王2");
+        Movie other = new Movie("塔の上のラプンツェル");
+        root.add(series);
+        series.add(first);
+        series.add(second);
+        root.add(other);
+        root.print("");
+        System.out.println("--- 鑑賞操作 ---");
+        first.finish();
+        first.rewatch();
+        first.start();
+        first.start();
+        first.finish();
+        first.finish();
+        first.start();
+        first.rewatch();
+        root.print("");
+        first.finish();
+        second.start();
+        System.out.println("--- 最終一覧 ---");
+        root.print("");
     }
 }

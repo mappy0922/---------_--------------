@@ -1,0 +1,467 @@
+% !TeX program = uplatex
+% Overleaf: Compiler = LaTeX / Main document = main.tex
+\documentclass[uplatex,dvipdfmx,a4paper,11pt]{jsarticle}
+\usepackage[margin=23mm]{geometry}
+\usepackage{booktabs}
+\usepackage{fancyvrb}
+\usepackage[dvipdfmx,unicode,hidelinks]{hyperref}
+\usepackage{pxjahyper}
+\fvset{fontsize=\scriptsize,tabsize=4}
+\newcommand{\code}[1]{\texttt{#1}}
+\title{学園祭の模擬店注文管理における\\Decorator・Stateパターンの適用と比較}
+\author{学籍番号：\underline{\hspace{35mm}}\quad 氏名：\underline{\hspace{35mm}}}
+\date{2026年11月}
+\begin{document}
+\maketitle
+\begin{abstract}
+学園祭の模擬店を題材に、商品へのトッピング追加と注文の進行管理を行うJavaプログラムを作成した。
+条件分岐を中心とする実装と、DecoratorおよびStateパターンを用いる実装を比較する。
+同じ注文と操作に対する実行結果を確認し、機能追加時の修正範囲、責任の分離、および構造が複雑になる負担を検討する。
+\end{abstract}
+
+\section{目的と題材}
+本課題は、複数のデザインパターンを用いる前後のコードを示し、その利点・効果・必要性を説明するものである\cite{assignment}。
+本稿では、授業で扱われたDecorator\cite{structural}とState\cite{behavioral}を選択した。
+模擬店では、商品の組合せに関する規則と、調理・受渡しの進行に関する規則が同時に存在する。
+前者を商品構成、後者を注文の状態として分離することで、異なる変更要求にそれぞれ対応する設計を検討できる。
+本実装は運営を模した小規模な例題であり、実際の店舗で利用した結果を報告するものではない。
+
+\section{対象システムの仕様}
+\subsection{商品と料金}
+1注文につき基本商品を1個選び、トッピングは注文生成時に確定する。価格は整数の円単位で扱う。
+支払い、在庫、注文取消し、複数端末からの同時操作は対象外とする。
+\begin{center}
+\begin{tabular}{llr}\toprule
+区分 & 名称 & 価格・追加料金（円）\\\midrule
+基本商品 & 焼きそば & 400\\
+基本商品 & お好み焼き & 500\\
+トッピング & チーズ & 80\\
+トッピング & 目玉焼き & 100\\\bottomrule
+\end{tabular}
+\end{center}
+比較では、各トッピングを最大1回まで指定する。適用前の実装は有無をbooleanで表す。
+適用後の実装はDecoratorを重ねられるため、同種を複数回追加できるが、その機能は前後の同等性を確認する比較範囲には含めない。
+
+\subsection{注文状態と操作}
+注文生成時の状態は受付済みとし、次の一方向の遷移を許す。
+\begin{center}
+受付済み $\longrightarrow$ 調理中 $\longrightarrow$ 受渡し待ち $\longrightarrow$ 受渡し済み
+\end{center}
+\begin{center}
+\begin{tabular}{lll}\toprule
+現在の状態 & 許可する操作 & 遷移先\\\midrule
+受付済み & 調理開始 & 調理中\\
+調理中 & 調理完了 & 受渡し待ち\\
+受渡し待ち & 受渡し & 受渡し済み\\
+受渡し済み & なし & 変更なし\\\bottomrule
+\end{tabular}
+\end{center}
+不許可の操作ではメッセージを表示し、状態を変更しない。
+例えば調理開始前の受渡しや、受渡し後の再度の受渡しを拒否する。
+
+\section{パターン適用前の設計}
+\code{BeforeMain.Order}は、商品名、トッピングの有無、注文状態を保持する。
+\code{description()}と\code{price()}は、それぞれトッピングを条件判定して説明文と価格を組み立てる。
+\code{startCooking()}、\code{finishCooking()}、\code{deliver()}も現在の状態を判定して処理する。
+この実装は処理を1クラスで追いやすく、商品と状態の種類が固定されている場合には簡潔である。
+一方、トッピングの情報はフィールド、コンストラクタ、説明文、価格計算に分散する。
+状態に関する規則も操作別のメソッドに分かれているため、仕様変更時に複数箇所を確認する必要がある。
+enumを使うだけではStateパターンとはいえず、本実装では列挙値を条件分岐に用いている。
+
+\section{パターン適用後の設計}
+\subsection{Decorator：商品とトッピングの合成}
+Decoratorは、元のオブジェクトと共通の型を持つオブジェクトで包み、処理を委譲しながら機能を追加する構造である\cite{structural}。
+本実装の役割は表\ref{tab:decorator}のとおりである。
+\begin{table}[htbp]\centering
+\caption{Decoratorの役割とクラス}\label{tab:decorator}
+\begin{tabular}{ll}\toprule
+役割 & 対応する型\\\midrule
+Component & \code{Food}\\
+ConcreteComponent & \code{Yakisoba}, \code{Okonomiyaki}\\
+Decorator & \code{Topping}\\
+ConcreteDecorator & \code{Cheese}, \code{FriedEgg}\\\bottomrule
+\end{tabular}
+\end{table}
+\code{Topping}は\code{Food}を実装すると同時に、内部にも\code{Food}を保持する。
+そのため、基本商品だけでなく、トッピングを追加済みの商品も同じように包める。
+注文1の構成は次のとおりである。
+\begin{Verbatim}
+new FriedEgg(new Cheese(new Yakisoba()))
+\end{Verbatim}
+価格計算は外側から内側へ委譲され、結果は$400+80+100=580$円となる。
+\code{Order}は具体的なトッピングの種類を判定せず、\code{Food}の操作を呼ぶだけでよい。
+
+\subsection{State：状態ごとの操作の分離}
+Stateは状態をオブジェクトとして表し、状態に応じた振舞いをそのオブジェクトへ委譲するパターンである\cite{behavioral}。
+\code{Order}がContext、\code{OrderState}がState、\code{Accepted}、\code{Cooking}、
+\code{Ready}、\code{Delivered}がConcreteStateに対応する。
+不許可操作は\code{OrderState}のdefaultメソッドで実装し、各具象状態は許可する操作のみを上書きする。
+例えば\code{Accepted.startCooking()}は状態を\code{Cooking}へ変更する。
+一方、\code{Accepted}は\code{deliver()}を上書きしないため、受付済みで受渡しを要求すると共通の拒否処理が実行される。
+各注文が自分の状態参照を保持するため、注文1を進めても注文2の状態は進まない。
+
+\subsection{2パターンの関係}
+Decoratorは「何を注文したか」、Stateは「注文がどこまで進んだか」を担当する。
+両者は\code{Order}で組み合わされるが、状態クラスはトッピングの構造を参照せず、商品クラスは注文状態を参照しない。
+なお、Javaファイルをレポートに掲載しやすくするため各型を入れ子クラスとした。
+ファイルが1個でも、型ごとに役割を分ける設計である点は変わらない。
+
+\section{実行と確認結果}
+JDK 21.0.11で両版をコンパイルし、各mainメソッドを実行した。
+付属ファイルのディレクトリを\code{src}として、実行コマンドを以下に示す。
+\begin{Verbatim}
+javac -encoding UTF-8 -d build before/BeforeMain.java after/AfterMain.java
+java -cp build before.BeforeMain
+java -cp build after.AfterMain
+\end{Verbatim}
+注文1はチーズと目玉焼きを追加した焼きそば、注文2は目玉焼きを追加したお好み焼きとした。
+両版の出力13行が一致することを確認した。出力全文を以下に示す。
+\begin{Verbatim}
+注文1: 焼きそば + チーズ + 目玉焼き / 580円 / 受付済み
+
+注文2: お好み焼き + 目玉焼き / 600円 / 受付済み
+
+受渡し不可（現在: 受付済み）
+
+調理を開始しました。
+
+調理開始不可（現在: 調理中）
+
+調理が完了しました。
+
+商品を受け渡しました。
+
+受渡し不可（現在: 受渡し済み）
+
+注文1: 焼きそば + チーズ + 目玉焼き / 580円 / 受渡し済み
+
+調理を開始しました。
+
+調理が完了しました。
+
+商品を受け渡しました。
+
+注文2: お好み焼き + 目玉焼き / 600円 / 受渡し済み
+\end{Verbatim}
+この実行例では、料金計算、2注文の正常な状態遷移、調理前の受渡し拒否、調理開始の重複拒否、受渡しの重複拒否を確認した。
+ただし、すべてのトッピング組合せや、全状態における全操作の組合せを網羅した検証ではない。
+出力一致はこの入力例に対する確認であり、あらゆる入力での同等性を証明するものではない。
+
+\section{利点・効果・必要性の考察}
+\subsection{変更要求に対する修正範囲}
+例えば「ねぎを50円で追加できるようにする」という変更を考える。
+適用前では、トッピング有無のフィールドとコンストラクタ引数を増やし、説明文と価格計算にも条件分岐を追加する必要がある。
+適用後では\code{Topping}のサブクラスを追加し、注文生成箇所で包むように変更する。
+既存の\code{Cheese}や基本商品の価格計算を修正せず、新しい追加分の説明文と価格を一緒に定義できる。
+この例では、Decoratorの利点はコードを短くすることより、変更に関係する知識を1つの型に集める点にある。
+
+Stateについて「受付済みの間だけ取消し可能にする」という変更を考える。
+適用後であっても、操作の追加にはStateインタフェースとContextの窓口、許可する状態、および取消し済み状態の追加が必要である。
+Stateを使えば修正が不要になるわけではない。
+ただし、受付済みでの許可規則を\code{Accepted}に置き、他の状態では共通の拒否処理を使う設計にできるため、状態ごとの規則を整理しやすい。
+これらの機能追加は比較のための想定であり、提出コードには実装していない。
+
+\subsection{適用に伴う負担}
+適用後はクラスが増え、価格の確認には包み込みの関係を、状態遷移の確認には複数の状態クラスを追う必要がある。
+また、現在は少数の商品と4状態のみであり、条件分岐版でも十分に扱える規模である。
+変更予定がなければ、パターン導入の負担が利点を上回る可能性もある。
+Decoratorは追加回数や組合せの制約を自動では保証せず、Stateも在庫や支払いの整合性を自動では保証しない。
+必要な制約は別途仕様として定め、実装・検証しなければならない。
+
+\subsection{この題材での位置付け}
+本例では、模擬店の商品構成と調理工程を別の変更軸として扱った。
+商品を包んで追加料金を計算する処理と、注文に許される操作を状態ごとに定める処理を独立させることに意義がある。
+ただし、題材自体が珍しいことを示すものではなく、独自性を判断するには具体的な仕様と設計上の工夫を見る必要がある。
+授業資料の構造を理解したうえで、それを注文1・注文2の料金と不正操作の拒否という具体的な振舞いに対応付けた。
+
+\section{結論}
+Decoratorによって商品とトッピングを同じ型で組み合わせ、Stateによって注文の進行に応じた操作を分離した。
+比較例では両版の出力が一致し、設計変更後も共通仕様の振舞いを保つことを確認できた。
+適用後の設計は変更対象を整理しやすい一方、クラス数と追跡の手間が増える。
+したがって、パターンの必要性は商品や工程の変更頻度、制約の複雑さと合わせて判断すべきである。
+
+\begin{thebibliography}{9}
+\bibitem{assignment} 尾崎知伸，『授業外レポート』，配布資料，\nolinkurl{out-class_report.pdf}．
+\bibitem{structural} 尾崎知伸，『発展プログラミング：構造に関するデザインパターン』，授業配布資料，\nolinkurl{04_advanced_programming_structural_patterns.pdf}．
+\bibitem{behavioral} 尾崎知伸，『発展プログラミング：振る舞いに関するデザインパターン』，授業配布資料，\nolinkurl{05_advanced_programming_behavioral_patterns.pdf}．
+\end{thebibliography}
+
+\appendix
+\clearpage
+\section{パターン適用前のコード全文}
+\begin{Verbatim}
+package before;
+
+/** デザインパターン適用前：トッピングと注文状態を条件分岐で処理する。 */
+public class BeforeMain {
+    enum Status { ACCEPTED, COOKING, READY, DELIVERED }
+
+    static class Order {
+        private final int number;
+        private final String menu;
+        private final boolean cheese;
+        private final boolean egg;
+        private Status status = Status.ACCEPTED;
+
+        Order(int number, String menu, boolean cheese, boolean egg) {
+            if (!menu.equals("焼きそば") && !menu.equals("お好み焼き")) {
+                throw new IllegalArgumentException("未対応のメニュー: " + menu);
+            }
+            this.number = number;
+            this.menu = menu;
+            this.cheese = cheese;
+            this.egg = egg;
+        }
+
+        String description() {
+            String result = menu;
+            if (cheese) result += " + チーズ";
+            if (egg) result += " + 目玉焼き";
+            return result;
+        }
+
+        int price() {
+            int result = menu.equals("焼きそば") ? 400 : 500;
+            if (cheese) result += 80;
+            if (egg) result += 100;
+            return result;
+        }
+
+        String statusLabel() {
+            switch (status) {
+                case ACCEPTED: return "受付済み";
+                case COOKING: return "調理中";
+                case READY: return "受渡し待ち";
+                case DELIVERED: return "受渡し済み";
+                default: throw new IllegalStateException();
+            }
+        }
+
+        void startCooking() {
+            if (status == Status.ACCEPTED) {
+                status = Status.COOKING;
+                System.out.println("調理を開始しました。");
+            } else {
+                System.out.println("調理開始不可（現在: " + statusLabel() + "）");
+            }
+        }
+
+        void finishCooking() {
+            if (status == Status.COOKING) {
+                status = Status.READY;
+                System.out.println("調理が完了しました。");
+            } else {
+                System.out.println("調理完了不可（現在: " + statusLabel() + "）");
+            }
+        }
+
+        void deliver() {
+            if (status == Status.READY) {
+                status = Status.DELIVERED;
+                System.out.println("商品を受け渡しました。");
+            } else {
+                System.out.println("受渡し不可（現在: " + statusLabel() + "）");
+            }
+        }
+
+        void printSummary() {
+            System.out.printf("注文%d: %s / %d円 / %s%n",
+                    number, description(), price(), statusLabel());
+        }
+    }
+
+    public static void main(String[] args) {
+        Order first = new Order(1, "焼きそば", true, true);
+        Order second = new Order(2, "お好み焼き", false, true);
+        first.printSummary();
+        second.printSummary();
+
+        // 調理前の受渡し、調理開始の重複、受渡しの重複を拒否する。
+        first.deliver();
+        first.startCooking();
+        first.startCooking();
+        first.finishCooking();
+        first.deliver();
+        first.deliver();
+        first.printSummary();
+
+        second.startCooking();
+        second.finishCooking();
+        second.deliver();
+        second.printSummary();
+    }
+}
+\end{Verbatim}
+\clearpage
+\section{パターン適用後のコード全文}
+\begin{Verbatim}
+package after;
+
+/** デザインパターン適用後：Decoratorで商品を構成し、Stateで注文を管理する。 */
+public class AfterMain {
+    // Component：基本商品とトッピングを共通の型で扱う。
+    interface Food {
+        String description();
+        int price();
+    }
+
+    static class Yakisoba implements Food {
+        public String description() { return "焼きそば"; }
+        public int price() { return 400; }
+    }
+
+    static class Okonomiyaki implements Food {
+        public String description() { return "お好み焼き"; }
+        public int price() { return 500; }
+    }
+
+    // Decorator：包み込んだ商品に処理を委譲する。
+    abstract static class Topping implements Food {
+        protected final Food food;
+
+        Topping(Food food) {
+            this.food = java.util.Objects.requireNonNull(food);
+        }
+
+        public String description() { return food.description(); }
+        public int price() { return food.price(); }
+    }
+
+    static class Cheese extends Topping {
+        Cheese(Food food) { super(food); }
+        public String description() { return super.description() + " + チーズ"; }
+        public int price() { return super.price() + 80; }
+    }
+
+    static class FriedEgg extends Topping {
+        FriedEgg(Food food) { super(food); }
+        public String description() { return super.description() + " + 目玉焼き"; }
+        public int price() { return super.price() + 100; }
+    }
+
+    // State：各状態で許可する操作だけを具象状態クラスで実装する。
+    interface OrderState {
+        String label();
+
+        default void startCooking(Order order) {
+            System.out.println("調理開始不可（現在: " + label() + "）");
+        }
+
+        default void finishCooking(Order order) {
+            System.out.println("調理完了不可（現在: " + label() + "）");
+        }
+
+        default void deliver(Order order) {
+            System.out.println("受渡し不可（現在: " + label() + "）");
+        }
+    }
+
+    static class Accepted implements OrderState {
+        public String label() { return "受付済み"; }
+        public void startCooking(Order order) {
+            order.changeState(new Cooking());
+            System.out.println("調理を開始しました。");
+        }
+    }
+
+    static class Cooking implements OrderState {
+        public String label() { return "調理中"; }
+        public void finishCooking(Order order) {
+            order.changeState(new Ready());
+            System.out.println("調理が完了しました。");
+        }
+    }
+
+    static class Ready implements OrderState {
+        public String label() { return "受渡し待ち"; }
+        public void deliver(Order order) {
+            order.changeState(new Delivered());
+            System.out.println("商品を受け渡しました。");
+        }
+    }
+
+    static class Delivered implements OrderState {
+        public String label() { return "受渡し済み"; }
+    }
+
+    // Context：状態ごとの分岐を書かず、現在の状態オブジェクトへ委譲する。
+    static class Order {
+        private final int number;
+        private final Food food;
+        private OrderState state = new Accepted();
+
+        Order(int number, Food food) {
+            this.number = number;
+            this.food = java.util.Objects.requireNonNull(food);
+        }
+
+        private void changeState(OrderState next) { state = next; }
+        void startCooking() { state.startCooking(this); }
+        void finishCooking() { state.finishCooking(this); }
+        void deliver() { state.deliver(this); }
+
+        void printSummary() {
+            System.out.printf("注文%d: %s / %d円 / %s%n",
+                    number, food.description(), food.price(), state.label());
+        }
+    }
+
+    public static void main(String[] args) {
+        Order first = new Order(1, new FriedEgg(new Cheese(new Yakisoba())));
+        Order second = new Order(2, new FriedEgg(new Okonomiyaki()));
+        first.printSummary();
+        second.printSummary();
+
+        // 適用前と同じ操作を、同じ順序で実行する。
+        first.deliver();
+        first.startCooking();
+        first.startCooking();
+        first.finishCooking();
+        first.deliver();
+        first.deliver();
+        first.printSummary();
+
+        second.startCooking();
+        second.finishCooking();
+        second.deliver();
+        second.printSummary();
+    }
+}
+\end{Verbatim}
+\clearpage
+\section{生成AIの利用に関する記録}
+\subsection{利用範囲と記録の状態}
+本課題では、OpenAIの対話型AI（Codex）を、テーマの検討、授業資料の確認、
+Javaコードと説明資料の生成、実行確認、LaTeXレポートの作成に利用した。
+本文とコードは生成AIが作成した原稿を含む。
+下記は作成時点で確認できる会話の要約であり、完全な会話記録ではない。
+生成AIを使わずに本人だけで作成した旨を主張するものではない。
+
+\textbf{提出前の作業：}課題資料は生成AIの利用履歴を末尾に添付することを求めている。
+この要約のみでその条件を満たすとは判断せず、今回のレポート作成依頼と応答も含む実際の会話履歴を
+原文のまま\code{ai-conversation.txt}へ保存する必要がある。
+IDEが自動で付加する情報や長いツール出力を省略する場合も、省略箇所と範囲を明記し、履歴を改変して見せないこと。
+
+\subsection{会話経過の要約（原文ではない）}
+\begin{enumerate}
+\item 利用者は課題PDFに基づくテーマの提案を依頼した。AIは最初、授業資料の範囲を確認せずStrategyやObserverを候補に含めた。
+\item 利用者は、パターンを同じ授業フォルダのPDFにあるものに限定するよう指定した。
+AIは授業資料を確認し、先の候補の不適合を訂正し、DecoratorとStateを使う模擬店注文管理を提案した。
+\item 利用者は学園祭の模擬店注文管理を選び、Javaで適用前後のコードをコードフォルダへ作るよう依頼した。
+AIは2つのJavaファイルとREADMEを作成し、コンパイルと実行を行った。
+\item 動作確認の初回では検証用の想定行数を15行としていたが、実際は13行だった。
+その後のUTF-8指定ではPowerShellの引数解釈による失敗もあり、引数を引用して再実行した。
+最終的に両版が正常終了し、13行の出力が一致することを確認した。
+\item 利用者はbuildフォルダの意味と実行方法を尋ね、AIはclassファイルの生成先およびコンパイル・実行コマンドを説明した。
+\item 利用者は採点基準への適合を尋ねた。AIは基本的なコード条件を満たす一方、独自性、本人の考察、PDFと履歴の準備が必要であると説明した。
+また、同一トッピングを重ねる機能の前後差を明示した。
+\item 利用者は「レポートをOverLeaf形式で作成して(Overleafフォルダに)」と依頼し、AIが本LaTeX原稿を作成した。
+\end{enumerate}
+
+\subsection{実際の会話履歴}
+% ???lstlisting????????????????????
+\begin{Verbatim}
+?????????????????????????AI??????????????????
+\end{Verbatim}
+
+\end{document}
