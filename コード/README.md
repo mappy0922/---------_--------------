@@ -35,5 +35,5 @@ StateはMovieがContext、ViewingStateがState、Unwatched・Watching・Watched�
 
 ## レポート
 
-Overleaf/main.texには以前の模擬店の本文とコードが残っています。今回の更新対象はJavaファイルと本READMEです。
+Overleaf/main.texは鑑賞リスト管理の本文・実行結果・コード全文に更新済みです。main.texとlatexmkrcをOverleafにアップロードし、CompilerをLaTeXに設定してください。
 課題指定のPDFには前後のコード、本人の言葉での考察、参考資料、実際の生成AI利用履歴を掲載してください。本コードと説明は生成AIが作成しています。

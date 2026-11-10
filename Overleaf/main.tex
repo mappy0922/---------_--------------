@@ -8,182 +8,198 @@
 \usepackage{pxjahyper}
 \fvset{fontsize=\scriptsize,tabsize=4}
 \newcommand{\code}[1]{\texttt{#1}}
-\title{学園祭の模擬店注文管理における\\Decorator・Stateパターンの適用と比較}
+\title{ディズニー作品の鑑賞リスト管理における\\Composite・Stateパターンの適用と比較}
 \author{学籍番号：\underline{\hspace{35mm}}\quad 氏名：\underline{\hspace{35mm}}}
 \date{2026年11月}
 \begin{document}
 \maketitle
 \begin{abstract}
-学園祭の模擬店を題材に、商品へのトッピング追加と注文の進行管理を行うJavaプログラムを作成した。
-条件分岐を中心とする実装と、DecoratorおよびStateパターンを用いる実装を比較する。
-同じ注文と操作に対する実行結果を確認し、機能追加時の修正範囲、責任の分離、および構造が複雑になる負担を検討する。
+ディズニー作品をシリーズ別に整理し、各作品の鑑賞状態とグループごとの進捗を管理するJavaプログラムを作成した。
+種類フラグと条件分岐による実装を、CompositeとStateを用いる実装へ変更し、同じ操作に対する出力を比較した。
+特に、再鑑賞で作品の状態が変わるとグループの集計も変わる点に着目し、責任分担、変更のしやすさ、および適用の負担を考察する。
 \end{abstract}
 
 \section{目的と題材}
-本課題は、複数のデザインパターンを用いる前後のコードを示し、その利点・効果・必要性を説明するものである\cite{assignment}。
-本稿では、授業で扱われたDecorator\cite{structural}とState\cite{behavioral}を選択した。
-模擬店では、商品の組合せに関する規則と、調理・受渡しの進行に関する規則が同時に存在する。
-前者を商品構成、後者を注文の状態として分離することで、異なる変更要求にそれぞれ対応する設計を検討できる。
-本実装は運営を模した小規模な例題であり、実際の店舗で利用した結果を報告するものではない。
+課題では、複数のデザインパターンを用いる前後のコードと、その利点・効果・必要性の説明が求められる\cite{assignment}。
+本稿では、授業で扱われたComposite\cite{structural}とState\cite{behavioral}を使用する。
+鑑賞リストでは、シリーズ単位のまとまりと個別作品を同時に扱う必要がある。
+また、作品を登録しただけの段階、鑑賞中、鑑賞完了では許可すべき操作が異なる。
+そこで、作品の階層構造と鑑賞状態を分離し、両者が集計で連携する例題を考えた。
+作品名はリストの具体例として使用し、配信状況や公式サービスの機能を再現するものではない。
 
-\section{対象システムの仕様}
-\subsection{商品と料金}
-1注文につき基本商品を1個選び、トッピングは注文生成時に確定する。価格は整数の円単位で扱う。
-支払い、在庫、注文取消し、複数端末からの同時操作は対象外とする。
-\begin{center}
-\begin{tabular}{llr}\toprule
-区分 & 名称 & 価格・追加料金（円）\\\midrule
-基本商品 & 焼きそば & 400\\
-基本商品 & お好み焼き & 500\\
-トッピング & チーズ & 80\\
-トッピング & 目玉焼き & 100\\\bottomrule
-\end{tabular}
-\end{center}
-比較では、各トッピングを最大1回まで指定する。適用前の実装は有無をbooleanで表す。
-適用後の実装はDecoratorを重ねられるため、同種を複数回追加できるが、その機能は前後の同等性を確認する比較範囲には含めない。
+\section{仕様}
+\subsection{リスト構造}
+実行例では、全体リストにシリーズと単独作品を登録する。
+シリーズ内には2作品を置き、全体では3作品とする。
+\begin{Verbatim}
+ディズニー作品の鑑賞リスト
+  アナと雪の女王シリーズ
+    アナと雪の女王
+    アナと雪の女王2
+  塔の上のラプンツェル
+\end{Verbatim}
+グループには作品だけでなく別のグループも追加できる。
+作品とグループをインデント付きで表示し、各グループには配下の鑑賞済み作品数と全作品数を表示する。
+空グループでは両方の数を0とする。
+呼出し側で循環、同一オブジェクトの共有、重複登録のない木を構成する前提とし、自動検出は実装しない。
+追加する要素がnullの場合は拒否する。
 
-\subsection{注文状態と操作}
-注文生成時の状態は受付済みとし、次の一方向の遷移を許す。
-\begin{center}
-受付済み $\longrightarrow$ 調理中 $\longrightarrow$ 受渡し待ち $\longrightarrow$ 受渡し済み
-\end{center}
-\begin{center}
-\begin{tabular}{lll}\toprule
-現在の状態 & 許可する操作 & 遷移先\\\midrule
-受付済み & 調理開始 & 調理中\\
-調理中 & 調理完了 & 受渡し待ち\\
-受渡し待ち & 受渡し & 受渡し済み\\
-受渡し済み & なし & 変更なし\\\bottomrule
-\end{tabular}
-\end{center}
-不許可の操作ではメッセージを表示し、状態を変更しない。
-例えば調理開始前の受渡しや、受渡し後の再度の受渡しを拒否する。
-
-\section{パターン適用前の設計}
-\code{BeforeMain.Order}は、商品名、トッピングの有無、注文状態を保持する。
-\code{description()}と\code{price()}は、それぞれトッピングを条件判定して説明文と価格を組み立てる。
-\code{startCooking()}、\code{finishCooking()}、\code{deliver()}も現在の状態を判定して処理する。
-この実装は処理を1クラスで追いやすく、商品と状態の種類が固定されている場合には簡潔である。
-一方、トッピングの情報はフィールド、コンストラクタ、説明文、価格計算に分散する。
-状態に関する規則も操作別のメソッドに分かれているため、仕様変更時に複数箇所を確認する必要がある。
-enumを使うだけではStateパターンとはいえず、本実装では列挙値を条件分岐に用いている。
-
-\section{パターン適用後の設計}
-\subsection{Decorator：商品とトッピングの合成}
-Decoratorは、元のオブジェクトと共通の型を持つオブジェクトで包み、処理を委譲しながら機能を追加する構造である\cite{structural}。
-本実装の役割は表\ref{tab:decorator}のとおりである。
+\subsection{鑑賞状態と操作}
+初期状態は未鑑賞とし、表\ref{tab:state}の操作を許可する。
+それ以外の操作では拒否メッセージを表示し、状態を変えない。
 \begin{table}[htbp]\centering
-\caption{Decoratorの役割とクラス}\label{tab:decorator}
-\begin{tabular}{ll}\toprule
-役割 & 対応する型\\\midrule
-Component & \code{Food}\\
-ConcreteComponent & \code{Yakisoba}, \code{Okonomiyaki}\\
-Decorator & \code{Topping}\\
-ConcreteDecorator & \code{Cheese}, \code{FriedEgg}\\\bottomrule
+\caption{許可する状態遷移}\label{tab:state}
+\begin{tabular}{lll}\toprule
+現在の状態 & 操作 & 遷移先\\\midrule
+未鑑賞 & \code{start()}：開始 & 鑑賞中\\
+鑑賞中 & \code{finish()}：完了 & 鑑賞済み\\
+鑑賞済み & \code{rewatch()}：再鑑賞 & 鑑賞中\\\bottomrule
 \end{tabular}
 \end{table}
-\code{Topping}は\code{Food}を実装すると同時に、内部にも\code{Food}を保持する。
-そのため、基本商品だけでなく、トッピングを追加済みの商品も同じように包める。
-注文1の構成は次のとおりである。
-\begin{Verbatim}
-new FriedEgg(new Cheese(new Yakisoba()))
-\end{Verbatim}
-価格計算は外側から内側へ委譲され、結果は$400+80+100=580$円となる。
-\code{Order}は具体的なトッピングの種類を判定せず、\code{Food}の操作を呼ぶだけでよい。
+集計は現在の状態を対象にする。再鑑賞を開始した作品は鑑賞中に戻るため、鑑賞済み件数から一時的に外れる。
+これは「過去に一度でも見た作品数」ではなく、「今回の鑑賞が完了している作品数」を表す仕様である。
+鑑賞履歴、鑑賞回数、停止位置、上映時間、ファイル保存、GUIは対象外とする。
 
-\subsection{State：状態ごとの操作の分離}
-Stateは状態をオブジェクトとして表し、状態に応じた振舞いをそのオブジェクトへ委譲するパターンである\cite{behavioral}。
-\code{Order}がContext、\code{OrderState}がState、\code{Accepted}、\code{Cooking}、
-\code{Ready}、\code{Delivered}がConcreteStateに対応する。
-不許可操作は\code{OrderState}のdefaultメソッドで実装し、各具象状態は許可する操作のみを上書きする。
-例えば\code{Accepted.startCooking()}は状態を\code{Cooking}へ変更する。
-一方、\code{Accepted}は\code{deliver()}を上書きしないため、受付済みで受渡しを要求すると共通の拒否処理が実行される。
-各注文が自分の状態参照を保持するため、注文1を進めても注文2の状態は進まない。
+\section{適用前の設計}
+\code{BeforeMain.Entry}が作品とグループを兼ねる。
+\code{group}がtrueならグループ、falseなら作品とし、表示と集計のたびに種類を判定する。
+作品に対して子を追加した場合や、グループに鑑賞操作を行った場合は例外を送出する。
+グループにも作品用の状態が存在し、作品にも空の子リストが存在するため、不要な情報を持つ点が問題になる。
 
-\subsection{2パターンの関係}
-Decoratorは「何を注文したか」、Stateは「注文がどこまで進んだか」を担当する。
-両者は\code{Order}で組み合わされるが、状態クラスはトッピングの構造を参照せず、商品クラスは注文状態を参照しない。
-なお、Javaファイルをレポートに掲載しやすくするため各型を入れ子クラスとした。
-ファイルが1個でも、型ごとに役割を分ける設計である点は変わらない。
+状態にはenumの\code{Status}を用い、開始・完了・再鑑賞の各メソッドで条件分岐する。
+列挙値による状態管理自体はStateパターンではなく、振舞いはEntryの中に置かれている。
+また、再帰的な構造は適用前にも存在するが、作品とグループの役割を型で分けていない。
+したがって、適用後の効果は再帰を初めて導入することではなく、種類判定と役割の混在を解消することにある。
+
+\section{適用後の設計}
+\subsection{Composite：作品とグループの統一的な操作}
+Compositeは、個別要素とその集合を共通の型で扱うためのパターンである\cite{structural}。
+本実装では表\ref{tab:roles}のように対応させた。
+\begin{table}[htbp]\centering
+\caption{パターンの役割と実装}\label{tab:roles}
+\begin{tabular}{lll}\toprule
+パターン & 役割 & 対応する型\\\midrule
+Composite & Component & \code{WatchEntry}\\
+ & Composite & \code{WatchGroup}\\
+ & Leaf & \code{Movie}\\\midrule
+State & Context & \code{Movie}\\
+ & State & \code{ViewingState}\\
+ & ConcreteState & \code{Unwatched}, \code{Watching}, \code{Watched}\\\bottomrule
+\end{tabular}
+\end{table}
+
+\code{WatchEntry}は表示、全作品数、鑑賞済み作品数の操作を定義する。
+\code{WatchGroup}は子を\code{List<WatchEntry>}として保持し、具体的な種類を判定せず操作を委譲する。
+Movieの全作品数は1、WatchGroupの全作品数は子の合計である。
+したがって、リスト全体でもシリーズ単位でも同じ方法で集計できる。
+子の追加はWatchGroupだけに、鑑賞操作はMovieだけに定義する。
+共通インタフェースに不適切な操作を含めないことで、Movieへの子追加などは型の段階で避けられる。
+
+\subsection{State：鑑賞状態ごとの振舞い}
+Stateは、状態をオブジェクトで表し、その状態に対応する処理を委譲するパターンである\cite{behavioral}。
+Movieは現在のViewingStateを保持し、開始・完了・再鑑賞を委譲する。
+不許可操作はインタフェースのdefaultメソッドにまとめ、各状態は許可する操作だけを上書きする。
+
+例えばUnwatchedは開始操作でWatchingへ遷移し、Watchingは完了操作でWatchedへ遷移する。
+Watchedは再鑑賞操作でWatchingに戻る。
+状態変更メソッドはMovie内のprivateメソッドであり、本例の入れ子クラスから呼び出す。
+状態クラスを別ファイルのトップレベル型へ分離する場合には、アクセス方法の再設計が必要である。
+
+\subsection{2パターンの連携}
+MovieはCompositeのLeafであると同時にStateのContextである。
+Movieの\code{watchedCount()}は現在の状態へ委譲し、Watchedだけが1を返し、他の状態は0を返す。
+WatchGroupはその値を合計するだけなので、作品の状態が変わると次の表示で集計も変わる。
+集計結果を別フィールドへ複製していないため、状態変更後にグループ側の件数を手動更新する必要がない。
 
 \section{実行と確認結果}
-JDK 21.0.11で両版をコンパイルし、各mainメソッドを実行した。
-付属ファイルのディレクトリを\code{src}として、実行コマンドを以下に示す。
+JDK 21.0.11で両版をコンパイルし、同じリスト構成と操作順で実行した。
+「コード」フォルダで実行するコマンドは次のとおりである。
 \begin{Verbatim}
 javac -encoding UTF-8 -d build before/BeforeMain.java after/AfterMain.java
 java -cp build before.BeforeMain
 java -cp build after.AfterMain
 \end{Verbatim}
-注文1はチーズと目玉焼きを追加した焼きそば、注文2は目玉焼きを追加したお好み焼きとした。
-両版の出力13行が一致することを確認した。出力全文を以下に示す。
+両版の出力27行が一致した。共通の出力全文を以下に示す。
 \begin{Verbatim}
-注文1: 焼きそば + チーズ + 目玉焼き / 580円 / 受付済み
-
-注文2: お好み焼き + 目玉焼き / 600円 / 受付済み
-
-受渡し不可（現在: 受付済み）
-
-調理を開始しました。
-
-調理開始不可（現在: 調理中）
-
-調理が完了しました。
-
-商品を受け渡しました。
-
-受渡し不可（現在: 受渡し済み）
-
-注文1: 焼きそば + チーズ + 目玉焼き / 580円 / 受渡し済み
-
-調理を開始しました。
-
-調理が完了しました。
-
-商品を受け渡しました。
-
-注文2: お好み焼き + 目玉焼き / 600円 / 受渡し済み
+[ディズニー作品の鑑賞リスト] 0/3作品鑑賞済み
+  [アナと雪の女王シリーズ] 0/2作品鑑賞済み
+    アナと雪の女王：未鑑賞
+    アナと雪の女王2：未鑑賞
+  塔の上のラプンツェル：未鑑賞
+--- 鑑賞操作 ---
+アナと雪の女王：完了不可（未鑑賞）
+アナと雪の女王：再鑑賞不可（未鑑賞）
+アナと雪の女王：鑑賞を開始しました
+アナと雪の女王：開始不可（鑑賞中）
+アナと雪の女王：鑑賞を完了しました
+アナと雪の女王：完了不可（鑑賞済み）
+アナと雪の女王：開始不可（鑑賞済み）
+アナと雪の女王：再鑑賞を開始しました
+[ディズニー作品の鑑賞リスト] 0/3作品鑑賞済み
+  [アナと雪の女王シリーズ] 0/2作品鑑賞済み
+    アナと雪の女王：鑑賞中
+    アナと雪の女王2：未鑑賞
+  塔の上のラプンツェル：未鑑賞
+アナと雪の女王：鑑賞を完了しました
+アナと雪の女王2：鑑賞を開始しました
+--- 最終一覧 ---
+[ディズニー作品の鑑賞リスト] 1/3作品鑑賞済み
+  [アナと雪の女王シリーズ] 1/2作品鑑賞済み
+    アナと雪の女王：鑑賞済み
+    アナと雪の女王2：鑑賞中
+  塔の上のラプンツェル：未鑑賞
 \end{Verbatim}
-この実行例では、料金計算、2注文の正常な状態遷移、調理前の受渡し拒否、調理開始の重複拒否、受渡しの重複拒否を確認した。
-ただし、すべてのトッピング組合せや、全状態における全操作の組合せを網羅した検証ではない。
-出力一致はこの入力例に対する確認であり、あらゆる入力での同等性を証明するものではない。
+
+未鑑賞での完了と再鑑賞、鑑賞中の重複開始、鑑賞済みでの完了と通常開始が拒否された。
+再鑑賞中の集計は0/3、再度完了した後の最終集計は1/3となる。
+最終状態は1作品目が鑑賞済み、2作品目が鑑賞中、単独作品が未鑑賞であり、状態が作品ごとに独立していることも確認できる。
+ただし、空グループ、より深い階層、鑑賞中の再鑑賞操作などはこの実行例には含まない。
+出力一致は本例の確認であり、すべての入力に対する同等性を証明するものではない。
 
 \section{利点・効果・必要性の考察}
-\subsection{変更要求に対する修正範囲}
-例えば「ねぎを50円で追加できるようにする」という変更を考える。
-適用前では、トッピング有無のフィールドとコンストラクタ引数を増やし、説明文と価格計算にも条件分岐を追加する必要がある。
-適用後では\code{Topping}のサブクラスを追加し、注文生成箇所で包むように変更する。
-既存の\code{Cheese}や基本商品の価格計算を修正せず、新しい追加分の説明文と価格を一緒に定義できる。
-この例では、Decoratorの利点はコードを短くすることより、変更に関係する知識を1つの型に集める点にある。
+\subsection{階層構造に対する効果}
+適用前もグループを入れ子にできるため、「階層を増やせること」だけでは適用後の固有の利点にならない。
+重要なのは、作品とグループに共通する操作をWatchEntryに絞り、子を持つ責任をWatchGroupへ分離したことである。
+これにより、グループに作品の状態が存在する不自然さや、作品に子を追加できてしまうAPIを減らせる。
 
-Stateについて「受付済みの間だけ取消し可能にする」という変更を考える。
-適用後であっても、操作の追加にはStateインタフェースとContextの窓口、許可する状態、および取消し済み状態の追加が必要である。
-Stateを使えば修正が不要になるわけではない。
-ただし、受付済みでの許可規則を\code{Accepted}に置き、他の状態では共通の拒否処理を使う設計にできるため、状態ごとの規則を整理しやすい。
-これらの機能追加は比較のための想定であり、提出コードには実装していない。
+新しいシリーズや分類グループを追加するだけなら、両版ともデータの構成変更で対応できる。
+一方、別の種類の個別要素を追加する際には、適用後はWatchEntryの実装として追加でき、WatchGroupの種類判定を増やす必要がない。
+ただし、例えばグループも含めて評価平均を求める共通操作を追加する場合は、インタフェースと各実装の修正が必要になる。
 
-\subsection{適用に伴う負担}
-適用後はクラスが増え、価格の確認には包み込みの関係を、状態遷移の確認には複数の状態クラスを追う必要がある。
-また、現在は少数の商品と4状態のみであり、条件分岐版でも十分に扱える規模である。
-変更予定がなければ、パターン導入の負担が利点を上回る可能性もある。
-Decoratorは追加回数や組合せの制約を自動では保証せず、Stateも在庫や支払いの整合性を自動では保証しない。
-必要な制約は別途仕様として定め、実装・検証しなければならない。
+\subsection{状態管理に対する効果}
+適用前では、状態の規則が開始・完了・再鑑賞という操作別のメソッドに分散する。
+適用後では、例えば「鑑賞済みで許可するのは再鑑賞」という規則をWatchedで確認できる。
+拒否処理の形式も共通化され、許可する操作とその遷移先が対応する状態クラスにまとまる。
 
-\subsection{この題材での位置付け}
-本例では、模擬店の商品構成と調理工程を別の変更軸として扱った。
-商品を包んで追加料金を計算する処理と、注文に許される操作を状態ごとに定める処理を独立させることに意義がある。
-ただし、題材自体が珍しいことを示すものではなく、独自性を判断するには具体的な仕様と設計上の工夫を見る必要がある。
-授業資料の構造を理解したうえで、それを注文1・注文2の料金と不正操作の拒否という具体的な振舞いに対応付けた。
+将来「鑑賞を中断した状態」を追加する場合、適用後でも新しい状態クラスだけでは十分でない。
+中断操作や再開操作を設けるなら、ViewingState、Movieの窓口、遷移元などの変更が必要になる。
+Stateの効果は修正がなくなることではなく、状態ごとの規則を整理できる点にある。
+この追加機能は検討例であり、現在のコードには実装していない。
+
+\subsection{題材に合わせた設計上の選択}
+ディズニー作品をシリーズと単独作品に整理する構造に加え、再鑑賞を明示的な操作として扱った。
+再鑑賞中は集計から外す仕様によって、Stateで表す作品の状態とCompositeによるグループの進捗が連携する。
+一方、一度見た作品を常に鑑賞済みとして残したい利用者には別の仕様が必要である。
+その場合は、現在の鑑賞状態と過去の鑑賞履歴を分けて管理するのが適切と考えられる。
+作品名を変更しただけではパターンの必要性の説明にならず、こうした管理方針と責任分担を具体的に示すことが重要である。
+
+\subsection{負担と限界}
+適用後は型が増え、少数の作品だけを扱う用途では条件分岐版の方が短く読みやすい場合がある。
+また、Composite自体は循環や重複登録を防がず、同じ作品を複数箇所に登録すれば件数の意味が変わる。
+本例では登録方法に前提を置いているため、実用化するなら登録時の検証が必要である。
+集計は表示のたびに再帰計算するため、大規模な木では繰り返し走査のコストも検討すべきである。
+本例では変更に強い構造を示すことを目的とし、速度向上を実測したものではない。
 
 \section{結論}
-Decoratorによって商品とトッピングを同じ型で組み合わせ、Stateによって注文の進行に応じた操作を分離した。
-比較例では両版の出力が一致し、設計変更後も共通仕様の振舞いを保つことを確認できた。
-適用後の設計は変更対象を整理しやすい一方、クラス数と追跡の手間が増える。
-したがって、パターンの必要性は商品や工程の変更頻度、制約の複雑さと合わせて判断すべきである。
+Compositeによって作品とグループの表示・集計を統一し、Stateによって作品の鑑賞操作を状態ごとに分離した。
+再鑑賞による状態変更も集計へ反映され、共通の実行例では適用前後の出力が一致した。
+一方、クラス数の増加や木構造の前提、履歴管理の不足などの限界がある。
+したがって、分類や状態の変更が見込まれるかを踏まえて導入を判断する必要がある。
 
 \begin{thebibliography}{9}
-\bibitem{assignment} 尾崎知伸，『授業外レポート』，配布資料，\nolinkurl{out-class_report.pdf}．
-\bibitem{structural} 尾崎知伸，『発展プログラミング：構造に関するデザインパターン』，授業配布資料，\nolinkurl{04_advanced_programming_structural_patterns.pdf}．
-\bibitem{behavioral} 尾崎知伸，『発展プログラミング：振る舞いに関するデザインパターン』，授業配布資料，\nolinkurl{05_advanced_programming_behavioral_patterns.pdf}．
+\bibitem{assignment} 尾崎知伸，授業外レポート，授業配布資料，\nolinkurl{out-class_report.pdf}．
+\bibitem{structural} 尾崎知伸，発展プログラミング・構造に関するパターンの配布資料，Compositeの節，\nolinkurl{04_advanced_programming_structural_patterns.pdf}．
+\bibitem{behavioral} 尾崎知伸，発展プログラミング・振る舞いに関するパターンの配布資料，Stateの節，\nolinkurl{05_advanced_programming_behavioral_patterns.pdf}．
 \end{thebibliography}
 
 \appendix
@@ -192,103 +208,118 @@ Decoratorによって商品とトッピングを同じ型で組み合わせ、St
 \begin{Verbatim}
 package before;
 
-/** デザインパターン適用前：トッピングと注文状態を条件分岐で処理する。 */
+import java.util.ArrayList;
+import java.util.List;
+
+/** 適用前：種類フラグと状態の条件分岐によって鑑賞リストを管理する。 */
 public class BeforeMain {
-    enum Status { ACCEPTED, COOKING, READY, DELIVERED }
+    enum Status { UNWATCHED, WATCHING, WATCHED }
 
-    static class Order {
-        private final int number;
-        private final String menu;
-        private final boolean cheese;
-        private final boolean egg;
-        private Status status = Status.ACCEPTED;
+    static class Entry {
+        private final String title;
+        private final boolean group;
+        private final List<Entry> children = new ArrayList<>();
+        private Status status = Status.UNWATCHED;
 
-        Order(int number, String menu, boolean cheese, boolean egg) {
-            if (!menu.equals("焼きそば") && !menu.equals("お好み焼き")) {
-                throw new IllegalArgumentException("未対応のメニュー: " + menu);
-            }
-            this.number = number;
-            this.menu = menu;
-            this.cheese = cheese;
-            this.egg = egg;
+        Entry(String title, boolean group) {
+            this.title = title;
+            this.group = group;
         }
 
-        String description() {
-            String result = menu;
-            if (cheese) result += " + チーズ";
-            if (egg) result += " + 目玉焼き";
-            return result;
+        void add(Entry child) {
+            if (!group) throw new IllegalStateException("作品には追加できません");
+            children.add(java.util.Objects.requireNonNull(child));
         }
 
-        int price() {
-            int result = menu.equals("焼きそば") ? 400 : 500;
-            if (cheese) result += 80;
-            if (egg) result += 100;
-            return result;
+        int totalCount() {
+            if (!group) return 1;
+            int count = 0;
+            for (Entry child : children) count += child.totalCount();
+            return count;
         }
 
-        String statusLabel() {
+        int watchedCount() {
+            if (!group) return status == Status.WATCHED ? 1 : 0;
+            int count = 0;
+            for (Entry child : children) count += child.watchedCount();
+            return count;
+        }
+
+        String label() {
             switch (status) {
-                case ACCEPTED: return "受付済み";
-                case COOKING: return "調理中";
-                case READY: return "受渡し待ち";
-                case DELIVERED: return "受渡し済み";
+                case UNWATCHED: return "未鑑賞";
+                case WATCHING: return "鑑賞中";
+                case WATCHED: return "鑑賞済み";
                 default: throw new IllegalStateException();
             }
         }
 
-        void startCooking() {
-            if (status == Status.ACCEPTED) {
-                status = Status.COOKING;
-                System.out.println("調理を開始しました。");
+        void print(String indent) {
+            if (group) {
+                System.out.printf("%s[%s] %d/%d作品鑑賞済み%n",
+                        indent, title, watchedCount(), totalCount());
+                for (Entry child : children) child.print(indent + "  ");
             } else {
-                System.out.println("調理開始不可（現在: " + statusLabel() + "）");
+                System.out.println(indent + title + "：" + label());
             }
         }
 
-        void finishCooking() {
-            if (status == Status.COOKING) {
-                status = Status.READY;
-                System.out.println("調理が完了しました。");
-            } else {
-                System.out.println("調理完了不可（現在: " + statusLabel() + "）");
-            }
+        void start() {
+            requireMovie();
+            if (status == Status.UNWATCHED) {
+                status = Status.WATCHING;
+                message("鑑賞を開始しました");
+            } else reject("開始");
         }
 
-        void deliver() {
-            if (status == Status.READY) {
-                status = Status.DELIVERED;
-                System.out.println("商品を受け渡しました。");
-            } else {
-                System.out.println("受渡し不可（現在: " + statusLabel() + "）");
-            }
+        void finish() {
+            requireMovie();
+            if (status == Status.WATCHING) {
+                status = Status.WATCHED;
+                message("鑑賞を完了しました");
+            } else reject("完了");
         }
 
-        void printSummary() {
-            System.out.printf("注文%d: %s / %d円 / %s%n",
-                    number, description(), price(), statusLabel());
+        void rewatch() {
+            requireMovie();
+            if (status == Status.WATCHED) {
+                status = Status.WATCHING;
+                message("再鑑賞を開始しました");
+            } else reject("再鑑賞");
         }
+
+        private void requireMovie() {
+            if (group) throw new IllegalStateException("作品を選択してください");
+        }
+        private void message(String text) { System.out.println(title + "：" + text); }
+        private void reject(String action) { message(action + "不可（" + label() + "）"); }
     }
 
     public static void main(String[] args) {
-        Order first = new Order(1, "焼きそば", true, true);
-        Order second = new Order(2, "お好み焼き", false, true);
-        first.printSummary();
-        second.printSummary();
-
-        // 調理前の受渡し、調理開始の重複、受渡しの重複を拒否する。
-        first.deliver();
-        first.startCooking();
-        first.startCooking();
-        first.finishCooking();
-        first.deliver();
-        first.deliver();
-        first.printSummary();
-
-        second.startCooking();
-        second.finishCooking();
-        second.deliver();
-        second.printSummary();
+        Entry root = new Entry("ディズニー作品の鑑賞リスト", true);
+        Entry series = new Entry("アナと雪の女王シリーズ", true);
+        Entry first = new Entry("アナと雪の女王", false);
+        Entry second = new Entry("アナと雪の女王2", false);
+        Entry other = new Entry("塔の上のラプンツェル", false);
+        root.add(series);
+        series.add(first);
+        series.add(second);
+        root.add(other);
+        root.print("");
+        System.out.println("--- 鑑賞操作 ---");
+        first.finish();
+        first.rewatch();
+        first.start();
+        first.start();
+        first.finish();
+        first.finish();
+        first.start();
+        first.rewatch();
+        root.print("");
+        first.finish();
+        second.start();
+        System.out.println("--- 最終一覧 ---");
+        root.print("");
     }
 }
 \end{Verbatim}
@@ -297,134 +328,124 @@ public class BeforeMain {
 \begin{Verbatim}
 package after;
 
-/** デザインパターン適用後：Decoratorで商品を構成し、Stateで注文を管理する。 */
+import java.util.ArrayList;
+import java.util.List;
+
+/** 適用後：Compositeで階層を、Stateで作品の鑑賞状態を管理する。 */
 public class AfterMain {
-    // Component：基本商品とトッピングを共通の型で扱う。
-    interface Food {
-        String description();
-        int price();
+    // Component：作品とグループに共通の操作。
+    interface WatchEntry {
+        int totalCount();
+        int watchedCount();
+        void print(String indent);
     }
 
-    static class Yakisoba implements Food {
-        public String description() { return "焼きそば"; }
-        public int price() { return 400; }
-    }
+    // Composite：子の種類を判定せず、表示と集計を再帰的に行う。
+    static class WatchGroup implements WatchEntry {
+        private final String title;
+        private final List<WatchEntry> children = new ArrayList<>();
 
-    static class Okonomiyaki implements Food {
-        public String description() { return "お好み焼き"; }
-        public int price() { return 500; }
-    }
-
-    // Decorator：包み込んだ商品に処理を委譲する。
-    abstract static class Topping implements Food {
-        protected final Food food;
-
-        Topping(Food food) {
-            this.food = java.util.Objects.requireNonNull(food);
+        WatchGroup(String title) { this.title = title; }
+        void add(WatchEntry child) {
+            children.add(java.util.Objects.requireNonNull(child));
         }
-
-        public String description() { return food.description(); }
-        public int price() { return food.price(); }
+        public int totalCount() {
+            int count = 0;
+            for (WatchEntry child : children) count += child.totalCount();
+            return count;
+        }
+        public int watchedCount() {
+            int count = 0;
+            for (WatchEntry child : children) count += child.watchedCount();
+            return count;
+        }
+        public void print(String indent) {
+            System.out.printf("%s[%s] %d/%d作品鑑賞済み%n",
+                    indent, title, watchedCount(), totalCount());
+            for (WatchEntry child : children) child.print(indent + "  ");
+        }
     }
 
-    static class Cheese extends Topping {
-        Cheese(Food food) { super(food); }
-        public String description() { return super.description() + " + チーズ"; }
-        public int price() { return super.price() + 80; }
-    }
-
-    static class FriedEgg extends Topping {
-        FriedEgg(Food food) { super(food); }
-        public String description() { return super.description() + " + 目玉焼き"; }
-        public int price() { return super.price() + 100; }
-    }
-
-    // State：各状態で許可する操作だけを具象状態クラスで実装する。
-    interface OrderState {
+    // State：不許可操作の共通処理。許可する操作を各状態で上書きする。
+    interface ViewingState {
         String label();
+        default int watchedCount() { return 0; }
+        default void start(Movie movie) { movie.reject("開始", label()); }
+        default void finish(Movie movie) { movie.reject("完了", label()); }
+        default void rewatch(Movie movie) { movie.reject("再鑑賞", label()); }
+    }
 
-        default void startCooking(Order order) {
-            System.out.println("調理開始不可（現在: " + label() + "）");
-        }
-
-        default void finishCooking(Order order) {
-            System.out.println("調理完了不可（現在: " + label() + "）");
-        }
-
-        default void deliver(Order order) {
-            System.out.println("受渡し不可（現在: " + label() + "）");
+    static class Unwatched implements ViewingState {
+        public String label() { return "未鑑賞"; }
+        public void start(Movie movie) {
+            movie.changeState(new Watching());
+            movie.message("鑑賞を開始しました");
         }
     }
 
-    static class Accepted implements OrderState {
-        public String label() { return "受付済み"; }
-        public void startCooking(Order order) {
-            order.changeState(new Cooking());
-            System.out.println("調理を開始しました。");
+    static class Watching implements ViewingState {
+        public String label() { return "鑑賞中"; }
+        public void finish(Movie movie) {
+            movie.changeState(new Watched());
+            movie.message("鑑賞を完了しました");
         }
     }
 
-    static class Cooking implements OrderState {
-        public String label() { return "調理中"; }
-        public void finishCooking(Order order) {
-            order.changeState(new Ready());
-            System.out.println("調理が完了しました。");
+    static class Watched implements ViewingState {
+        public String label() { return "鑑賞済み"; }
+        public int watchedCount() { return 1; }
+        public void rewatch(Movie movie) {
+            movie.changeState(new Watching());
+            movie.message("再鑑賞を開始しました");
         }
     }
 
-    static class Ready implements OrderState {
-        public String label() { return "受渡し待ち"; }
-        public void deliver(Order order) {
-            order.changeState(new Delivered());
-            System.out.println("商品を受け渡しました。");
+    // CompositeのLeafであり、StateのContextでもある。
+    static class Movie implements WatchEntry {
+        private final String title;
+        private ViewingState state = new Unwatched();
+
+        Movie(String title) { this.title = title; }
+        private void changeState(ViewingState next) { state = next; }
+        private void message(String text) { System.out.println(title + "：" + text); }
+        private void reject(String action, String label) {
+            message(action + "不可（" + label + "）");
         }
-    }
-
-    static class Delivered implements OrderState {
-        public String label() { return "受渡し済み"; }
-    }
-
-    // Context：状態ごとの分岐を書かず、現在の状態オブジェクトへ委譲する。
-    static class Order {
-        private final int number;
-        private final Food food;
-        private OrderState state = new Accepted();
-
-        Order(int number, Food food) {
-            this.number = number;
-            this.food = java.util.Objects.requireNonNull(food);
-        }
-
-        private void changeState(OrderState next) { state = next; }
-        void startCooking() { state.startCooking(this); }
-        void finishCooking() { state.finishCooking(this); }
-        void deliver() { state.deliver(this); }
-
-        void printSummary() {
-            System.out.printf("注文%d: %s / %d円 / %s%n",
-                    number, food.description(), food.price(), state.label());
+        void start() { state.start(this); }
+        void finish() { state.finish(this); }
+        void rewatch() { state.rewatch(this); }
+        public int totalCount() { return 1; }
+        public int watchedCount() { return state.watchedCount(); }
+        public void print(String indent) {
+            System.out.println(indent + title + "：" + state.label());
         }
     }
 
     public static void main(String[] args) {
-        Order first = new Order(1, new FriedEgg(new Cheese(new Yakisoba())));
-        Order second = new Order(2, new FriedEgg(new Okonomiyaki()));
-        first.printSummary();
-        second.printSummary();
-
-        // 適用前と同じ操作を、同じ順序で実行する。
-        first.deliver();
-        first.startCooking();
-        first.startCooking();
-        first.finishCooking();
-        first.deliver();
-        first.deliver();
-        first.printSummary();
-
-        second.startCooking();
-        second.finishCooking();
-        second.deliver();
-        second.printSummary();
+        WatchGroup root = new WatchGroup("ディズニー作品の鑑賞リスト");
+        WatchGroup series = new WatchGroup("アナと雪の女王シリーズ");
+        Movie first = new Movie("アナと雪の女王");
+        Movie second = new Movie("アナと雪の女王2");
+        Movie other = new Movie("塔の上のラプンツェル");
+        root.add(series);
+        series.add(first);
+        series.add(second);
+        root.add(other);
+        root.print("");
+        System.out.println("--- 鑑賞操作 ---");
+        first.finish();
+        first.rewatch();
+        first.start();
+        first.start();
+        first.finish();
+        first.finish();
+        first.start();
+        first.rewatch();
+        root.print("");
+        first.finish();
+        second.start();
+        System.out.println("--- 最終一覧 ---");
+        root.print("");
     }
 }
 \end{Verbatim}
@@ -439,7 +460,7 @@ Javaコードと説明資料の生成、実行確認、LaTeXレポートの作�
 
 \textbf{提出前の作業：}課題資料は生成AIの利用履歴を末尾に添付することを求めている。
 この要約のみでその条件を満たすとは判断せず、今回のレポート作成依頼と応答も含む実際の会話履歴を
-原文のまま\code{ai-conversation.txt}へ保存する必要がある。
+原文のまま本付録の末尾へ追記する必要がある。
 IDEが自動で付加する情報や長いツール出力を省略する場合も、省略箇所と範囲を明記し、履歴を改変して見せないこと。
 
 \subsection{会話経過の要約（原文ではない）}
@@ -456,12 +477,14 @@ AIは2つのJavaファイルとREADMEを作成し、コンパイルと実行を�
 \item 利用者は採点基準への適合を尋ねた。AIは基本的なコード条件を満たす一方、独自性、本人の考察、PDFと履歴の準備が必要であると説明した。
 また、同一トッピングを重ねる機能の前後差を明示した。
 \item 利用者は「レポートをOverLeaf形式で作成して(Overleafフォルダに)」と依頼し、AIが本LaTeX原稿を作成した。
+\item 利用者はコンパイルの問題を報告し、2ファイル構成と軽量化を依頼した。AIはコードを本文へ統合し、upLaTeXと簡素なコード表示へ変更した。PDFの組版はローカルでは未確認である。
+\item 利用者はディズニー作品の鑑賞リスト管理へ題材を変更し、AIがCompositeとStateを用いる前後のJavaコードを生成した。実行例では出力27行の一致を確認した。
+\item 利用者は変更後のコードに合わせたmain.texの書換えを依頼し、AIが本文・比較・実行結果・コード全文を更新した。
 \end{enumerate}
 
 \subsection{実際の会話履歴}
-% ???lstlisting????????????????????
+% Paste the original conversation below.
 \begin{Verbatim}
-?????????????????????????AI??????????????????
+未添付：実際のAI会話履歴をここに貼り付けてください。
 \end{Verbatim}
-
 \end{document}
