@@ -89,14 +89,38 @@ public class BeforeMain {
 
     public static void main(String[] args) {
         Entry root = new Entry("ディズニー作品の鑑賞リスト", true);
+        Entry modern = new Entry("近年のアニメーション作品", true);
         Entry series = new Entry("アナと雪の女王シリーズ", true);
+        Entry ralphSeries = new Entry("シュガー・ラッシュシリーズ", true);
+        Entry classics = new Entry("名作アニメーション作品", true);
         Entry first = new Entry("アナと雪の女王", false);
         Entry second = new Entry("アナと雪の女王2", false);
-        Entry other = new Entry("塔の上のラプンツェル", false);
-        root.add(series);
+        Entry ralph = new Entry("シュガー・ラッシュ", false);
+        Entry ralph2 = new Entry("シュガー・ラッシュ：オンライン", false);
+        Entry rapunzel = new Entry("塔の上のラプンツェル", false);
+        Entry zootopia = new Entry("ズートピア", false);
+        Entry baymax = new Entry("ベイマックス", false);
+        Entry moana = new Entry("モアナと伝説の海", false);
+        Entry lion = new Entry("ライオン・キング", false);
+        Entry aladdin = new Entry("アラジン", false);
+        Entry beauty = new Entry("美女と野獣", false);
+        Entry mermaid = new Entry("リトル・マーメイド", false);
+        root.add(modern);
+        root.add(classics);
+        modern.add(series);
+        modern.add(ralphSeries);
+        modern.add(rapunzel);
+        modern.add(zootopia);
+        modern.add(baymax);
+        modern.add(moana);
         series.add(first);
         series.add(second);
-        root.add(other);
+        ralphSeries.add(ralph);
+        ralphSeries.add(ralph2);
+        classics.add(lion);
+        classics.add(aladdin);
+        classics.add(beauty);
+        classics.add(mermaid);
         root.print("");
         System.out.println("--- 鑑賞操作 ---");
         first.finish();
@@ -110,6 +134,13 @@ public class BeforeMain {
         root.print("");
         first.finish();
         second.start();
+        rapunzel.start();
+        rapunzel.finish();
+        ralph.start();
+        ralph.finish();
+        lion.start();
+        lion.finish();
+        zootopia.start();
         System.out.println("--- 最終一覧 ---");
         root.print("");
     }

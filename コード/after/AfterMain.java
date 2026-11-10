@@ -95,14 +95,38 @@ public class AfterMain {
 
     public static void main(String[] args) {
         WatchGroup root = new WatchGroup("ディズニー作品の鑑賞リスト");
+        WatchGroup modern = new WatchGroup("近年のアニメーション作品");
         WatchGroup series = new WatchGroup("アナと雪の女王シリーズ");
+        WatchGroup ralphSeries = new WatchGroup("シュガー・ラッシュシリーズ");
+        WatchGroup classics = new WatchGroup("名作アニメーション作品");
         Movie first = new Movie("アナと雪の女王");
         Movie second = new Movie("アナと雪の女王2");
-        Movie other = new Movie("塔の上のラプンツェル");
-        root.add(series);
+        Movie ralph = new Movie("シュガー・ラッシュ");
+        Movie ralph2 = new Movie("シュガー・ラッシュ：オンライン");
+        Movie rapunzel = new Movie("塔の上のラプンツェル");
+        Movie zootopia = new Movie("ズートピア");
+        Movie baymax = new Movie("ベイマックス");
+        Movie moana = new Movie("モアナと伝説の海");
+        Movie lion = new Movie("ライオン・キング");
+        Movie aladdin = new Movie("アラジン");
+        Movie beauty = new Movie("美女と野獣");
+        Movie mermaid = new Movie("リトル・マーメイド");
+        root.add(modern);
+        root.add(classics);
+        modern.add(series);
+        modern.add(ralphSeries);
+        modern.add(rapunzel);
+        modern.add(zootopia);
+        modern.add(baymax);
+        modern.add(moana);
         series.add(first);
         series.add(second);
-        root.add(other);
+        ralphSeries.add(ralph);
+        ralphSeries.add(ralph2);
+        classics.add(lion);
+        classics.add(aladdin);
+        classics.add(beauty);
+        classics.add(mermaid);
         root.print("");
         System.out.println("--- 鑑賞操作 ---");
         first.finish();
@@ -116,6 +140,13 @@ public class AfterMain {
         root.print("");
         first.finish();
         second.start();
+        rapunzel.start();
+        rapunzel.finish();
+        ralph.start();
+        ralph.finish();
+        lion.start();
+        lion.finish();
+        zootopia.start();
         System.out.println("--- 最終一覧 ---");
         root.print("");
     }

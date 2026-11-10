@@ -29,14 +29,28 @@
 
 \section{仕様}
 \subsection{リスト構造}
-実行例では、全体リストにシリーズと単独作品を登録する。
-シリーズ内には2作品を置き、全体では3作品とする。
+実行例では、全体リストを「近年のアニメーション作品」と「名作アニメーション作品」に分け、計12作品を登録する。
+前者には2つのシリーズと4つの単独作品、後者には4作品を置く。
+分類は本例独自の整理用ラベルであり、公式の分類や全作品の網羅を意味しない。
+以下に登録作品の階層を示す。
 \begin{Verbatim}
 ディズニー作品の鑑賞リスト
-  アナと雪の女王シリーズ
-    アナと雪の女王
-    アナと雪の女王2
-  塔の上のラプンツェル
+  近年のアニメーション作品
+    アナと雪の女王シリーズ
+      アナと雪の女王
+      アナと雪の女王2
+    シュガー・ラッシュシリーズ
+      シュガー・ラッシュ
+      シュガー・ラッシュ：オンライン
+    塔の上のラプンツェル
+    ズートピア
+    ベイマックス
+    モアナと伝説の海
+  名作アニメーション作品
+    ライオン・キング
+    アラジン
+    美女と野獣
+    リトル・マーメイド
 \end{Verbatim}
 グループには作品だけでなく別のグループも追加できる。
 作品とグループをインデント付きで表示し、各グループには配下の鑑賞済み作品数と全作品数を表示する。
@@ -119,13 +133,25 @@ javac -encoding UTF-8 -d build before/BeforeMain.java after/AfterMain.java
 java -cp build before.BeforeMain
 java -cp build after.AfterMain
 \end{Verbatim}
-両版の出力27行が一致した。共通の出力全文を以下に示す。
+両版の出力70行が一致した。共通の出力全文を以下に示す。
 \begin{Verbatim}
-[ディズニー作品の鑑賞リスト] 0/3作品鑑賞済み
-  [アナと雪の女王シリーズ] 0/2作品鑑賞済み
-    アナと雪の女王：未鑑賞
-    アナと雪の女王2：未鑑賞
-  塔の上のラプンツェル：未鑑賞
+[ディズニー作品の鑑賞リスト] 0/12作品鑑賞済み
+  [近年のアニメーション作品] 0/8作品鑑賞済み
+    [アナと雪の女王シリーズ] 0/2作品鑑賞済み
+      アナと雪の女王：未鑑賞
+      アナと雪の女王2：未鑑賞
+    [シュガー・ラッシュシリーズ] 0/2作品鑑賞済み
+      シュガー・ラッシュ：未鑑賞
+      シュガー・ラッシュ：オンライン：未鑑賞
+    塔の上のラプンツェル：未鑑賞
+    ズートピア：未鑑賞
+    ベイマックス：未鑑賞
+    モアナと伝説の海：未鑑賞
+  [名作アニメーション作品] 0/4作品鑑賞済み
+    ライオン・キング：未鑑賞
+    アラジン：未鑑賞
+    美女と野獣：未鑑賞
+    リトル・マーメイド：未鑑賞
 --- 鑑賞操作 ---
 アナと雪の女王：完了不可（未鑑賞）
 アナと雪の女王：再鑑賞不可（未鑑賞）
@@ -135,25 +161,58 @@ java -cp build after.AfterMain
 アナと雪の女王：完了不可（鑑賞済み）
 アナと雪の女王：開始不可（鑑賞済み）
 アナと雪の女王：再鑑賞を開始しました
-[ディズニー作品の鑑賞リスト] 0/3作品鑑賞済み
-  [アナと雪の女王シリーズ] 0/2作品鑑賞済み
-    アナと雪の女王：鑑賞中
-    アナと雪の女王2：未鑑賞
-  塔の上のラプンツェル：未鑑賞
+[ディズニー作品の鑑賞リスト] 0/12作品鑑賞済み
+  [近年のアニメーション作品] 0/8作品鑑賞済み
+    [アナと雪の女王シリーズ] 0/2作品鑑賞済み
+      アナと雪の女王：鑑賞中
+      アナと雪の女王2：未鑑賞
+    [シュガー・ラッシュシリーズ] 0/2作品鑑賞済み
+      シュガー・ラッシュ：未鑑賞
+      シュガー・ラッシュ：オンライン：未鑑賞
+    塔の上のラプンツェル：未鑑賞
+    ズートピア：未鑑賞
+    ベイマックス：未鑑賞
+    モアナと伝説の海：未鑑賞
+  [名作アニメーション作品] 0/4作品鑑賞済み
+    ライオン・キング：未鑑賞
+    アラジン：未鑑賞
+    美女と野獣：未鑑賞
+    リトル・マーメイド：未鑑賞
 アナと雪の女王：鑑賞を完了しました
 アナと雪の女王2：鑑賞を開始しました
+塔の上のラプンツェル：鑑賞を開始しました
+塔の上のラプンツェル：鑑賞を完了しました
+シュガー・ラッシュ：鑑賞を開始しました
+シュガー・ラッシュ：鑑賞を完了しました
+ライオン・キング：鑑賞を開始しました
+ライオン・キング：鑑賞を完了しました
+ズートピア：鑑賞を開始しました
 --- 最終一覧 ---
-[ディズニー作品の鑑賞リスト] 1/3作品鑑賞済み
-  [アナと雪の女王シリーズ] 1/2作品鑑賞済み
-    アナと雪の女王：鑑賞済み
-    アナと雪の女王2：鑑賞中
-  塔の上のラプンツェル：未鑑賞
+[ディズニー作品の鑑賞リスト] 4/12作品鑑賞済み
+  [近年のアニメーション作品] 3/8作品鑑賞済み
+    [アナと雪の女王シリーズ] 1/2作品鑑賞済み
+      アナと雪の女王：鑑賞済み
+      アナと雪の女王2：鑑賞中
+    [シュガー・ラッシュシリーズ] 1/2作品鑑賞済み
+      シュガー・ラッシュ：鑑賞済み
+      シュガー・ラッシュ：オンライン：未鑑賞
+    塔の上のラプンツェル：鑑賞済み
+    ズートピア：鑑賞中
+    ベイマックス：未鑑賞
+    モアナと伝説の海：未鑑賞
+  [名作アニメーション作品] 1/4作品鑑賞済み
+    ライオン・キング：鑑賞済み
+    アラジン：未鑑賞
+    美女と野獣：未鑑賞
+    リトル・マーメイド：未鑑賞
 \end{Verbatim}
 
 未鑑賞での完了と再鑑賞、鑑賞中の重複開始、鑑賞済みでの完了と通常開始が拒否された。
-再鑑賞中の集計は0/3、再度完了した後の最終集計は1/3となる。
-最終状態は1作品目が鑑賞済み、2作品目が鑑賞中、単独作品が未鑑賞であり、状態が作品ごとに独立していることも確認できる。
-ただし、空グループ、より深い階層、鑑賞中の再鑑賞操作などはこの実行例には含まない。
+再鑑賞中の全体集計は0/12となる。その後、最初の作品を再度完了し、ラプンツェル、シュガー・ラッシュ、ライオン・キングも完了すると、最終集計は4/12となる。
+分類ごとでは近年の作品が3/8、名作が1/4、シリーズごとではそれぞれ1/2となる。
+最終状態は4作品が鑑賞済み、アナと雪の女王2とズートピアが鑑賞中、残り6作品が未鑑賞である。
+複数の分類にまたがる操作でも、作品ごとの状態と階層別の集計が独立して反映されることを確認できる。
+ただし、空グループ、ここで示した構造より深い階層、鑑賞中の再鑑賞操作などはこの実行例には含まない。
 出力一致は本例の確認であり、すべての入力に対する同等性を証明するものではない。
 
 \section{利点・効果・必要性の考察}
@@ -297,14 +356,38 @@ public class BeforeMain {
 
     public static void main(String[] args) {
         Entry root = new Entry("ディズニー作品の鑑賞リスト", true);
+        Entry modern = new Entry("近年のアニメーション作品", true);
         Entry series = new Entry("アナと雪の女王シリーズ", true);
+        Entry ralphSeries = new Entry("シュガー・ラッシュシリーズ", true);
+        Entry classics = new Entry("名作アニメーション作品", true);
         Entry first = new Entry("アナと雪の女王", false);
         Entry second = new Entry("アナと雪の女王2", false);
-        Entry other = new Entry("塔の上のラプンツェル", false);
-        root.add(series);
+        Entry ralph = new Entry("シュガー・ラッシュ", false);
+        Entry ralph2 = new Entry("シュガー・ラッシュ：オンライン", false);
+        Entry rapunzel = new Entry("塔の上のラプンツェル", false);
+        Entry zootopia = new Entry("ズートピア", false);
+        Entry baymax = new Entry("ベイマックス", false);
+        Entry moana = new Entry("モアナと伝説の海", false);
+        Entry lion = new Entry("ライオン・キング", false);
+        Entry aladdin = new Entry("アラジン", false);
+        Entry beauty = new Entry("美女と野獣", false);
+        Entry mermaid = new Entry("リトル・マーメイド", false);
+        root.add(modern);
+        root.add(classics);
+        modern.add(series);
+        modern.add(ralphSeries);
+        modern.add(rapunzel);
+        modern.add(zootopia);
+        modern.add(baymax);
+        modern.add(moana);
         series.add(first);
         series.add(second);
-        root.add(other);
+        ralphSeries.add(ralph);
+        ralphSeries.add(ralph2);
+        classics.add(lion);
+        classics.add(aladdin);
+        classics.add(beauty);
+        classics.add(mermaid);
         root.print("");
         System.out.println("--- 鑑賞操作 ---");
         first.finish();
@@ -318,6 +401,13 @@ public class BeforeMain {
         root.print("");
         first.finish();
         second.start();
+        rapunzel.start();
+        rapunzel.finish();
+        ralph.start();
+        ralph.finish();
+        lion.start();
+        lion.finish();
+        zootopia.start();
         System.out.println("--- 最終一覧 ---");
         root.print("");
     }
@@ -423,14 +513,38 @@ public class AfterMain {
 
     public static void main(String[] args) {
         WatchGroup root = new WatchGroup("ディズニー作品の鑑賞リスト");
+        WatchGroup modern = new WatchGroup("近年のアニメーション作品");
         WatchGroup series = new WatchGroup("アナと雪の女王シリーズ");
+        WatchGroup ralphSeries = new WatchGroup("シュガー・ラッシュシリーズ");
+        WatchGroup classics = new WatchGroup("名作アニメーション作品");
         Movie first = new Movie("アナと雪の女王");
         Movie second = new Movie("アナと雪の女王2");
-        Movie other = new Movie("塔の上のラプンツェル");
-        root.add(series);
+        Movie ralph = new Movie("シュガー・ラッシュ");
+        Movie ralph2 = new Movie("シュガー・ラッシュ：オンライン");
+        Movie rapunzel = new Movie("塔の上のラプンツェル");
+        Movie zootopia = new Movie("ズートピア");
+        Movie baymax = new Movie("ベイマックス");
+        Movie moana = new Movie("モアナと伝説の海");
+        Movie lion = new Movie("ライオン・キング");
+        Movie aladdin = new Movie("アラジン");
+        Movie beauty = new Movie("美女と野獣");
+        Movie mermaid = new Movie("リトル・マーメイド");
+        root.add(modern);
+        root.add(classics);
+        modern.add(series);
+        modern.add(ralphSeries);
+        modern.add(rapunzel);
+        modern.add(zootopia);
+        modern.add(baymax);
+        modern.add(moana);
         series.add(first);
         series.add(second);
-        root.add(other);
+        ralphSeries.add(ralph);
+        ralphSeries.add(ralph2);
+        classics.add(lion);
+        classics.add(aladdin);
+        classics.add(beauty);
+        classics.add(mermaid);
         root.print("");
         System.out.println("--- 鑑賞操作 ---");
         first.finish();
@@ -444,6 +558,13 @@ public class AfterMain {
         root.print("");
         first.finish();
         second.start();
+        rapunzel.start();
+        rapunzel.finish();
+        ralph.start();
+        ralph.finish();
+        lion.start();
+        lion.finish();
+        zootopia.start();
         System.out.println("--- 最終一覧 ---");
         root.print("");
     }
@@ -480,6 +601,7 @@ AIは2つのJavaファイルとREADMEを作成し、コンパイルと実行を�
 \item 利用者はコンパイルの問題を報告し、2ファイル構成と軽量化を依頼した。AIはコードを本文へ統合し、upLaTeXと簡素なコード表示へ変更した。PDFの組版はローカルでは未確認である。
 \item 利用者はディズニー作品の鑑賞リスト管理へ題材を変更し、AIがCompositeとStateを用いる前後のJavaコードを生成した。実行例では出力27行の一致を確認した。
 \item 利用者は変更後のコードに合わせたmain.texの書換えを依頼し、AIが本文・比較・実行結果・コード全文を更新した。
+\item 利用者は鑑賞リストの拡充を依頼し、AIは12作品と複数階層へ拡張してJavaコード・本文・実行結果を同期した。
 \end{enumerate}
 
 \subsection{実際の会話履歴}
